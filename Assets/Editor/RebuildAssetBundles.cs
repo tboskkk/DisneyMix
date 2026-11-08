@@ -32,7 +32,12 @@ public static class RebuildAssetBundles
         string rawBuildPath = Path.Combine(OutputRoot, RawBuildFolderName);
 
         // 1. Setup Directories
-        if (Directory.Exists(OutputRoot)) Directory.Delete(OutputRoot, true);
+        // Only this platform's folder is cleared, so rebuilding one platform
+        // keeps the bundles already built for the others (windows64 ships
+        // prebuilt in the repo).
+        string platformRoot = Path.Combine(OutputRoot, platformFolder);
+        if (Directory.Exists(platformRoot)) Directory.Delete(platformRoot, true);
+        if (Directory.Exists(rawBuildPath)) Directory.Delete(rawBuildPath, true);
         Directory.CreateDirectory(rawBuildPath);
 
         // 2. Build Bundles
@@ -91,6 +96,32 @@ public static class RebuildAssetBundles
 
         AssetDatabase.Refresh();
         Debug.Log($"Successfully organized {movedCount} bundles based on AssetBundles.json for {platformFolder}.");
+    }
+
+    // Batchmode entry point (-executeMethod RebuildAssetBundles.RebuildAllBatch).
+    // RebuildAll reports failures with Debug.LogError and returns, so under
+    // -quit the editor would still exit 0. This exits 1 when it throws or
+    // leaves no bundles for the active platform.
+    public static void RebuildAllBatch()
+    {
+        string platformRoot = Path.Combine(OutputRoot, GetPlatformFolder(EditorUserBuildSettings.activeBuildTarget));
+        try
+        {
+            RebuildAll();
+        }
+        catch (Exception e)
+        {
+            Debug.LogException(e);
+            EditorApplication.Exit(1);
+            return;
+        }
+        if (!Directory.Exists(platformRoot) || Directory.GetFiles(platformRoot, "*.unity3d", SearchOption.AllDirectories).Length == 0)
+        {
+            Debug.LogError($"No bundles were written to {platformRoot}.");
+            EditorApplication.Exit(1);
+            return;
+        }
+        EditorApplication.Exit(0);
     }
 
     private static string GetPlatformFolder(BuildTarget target)
