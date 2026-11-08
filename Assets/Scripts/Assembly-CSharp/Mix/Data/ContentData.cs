@@ -69,14 +69,14 @@ namespace Mix.Data
 
 		public void OnZipFileAssetObject(string zipFileBasePath, object userData)
 		{
-			if (string.IsNullOrEmpty(zipFileBasePath))
-			{
-				Caller.OnContentDataDone("Error loading JOE data.");
-				return;
-			}
-			// The catalog ships in StreamingAssets. Path.Combine picks the
-			// platform's separator; a hard-coded "\\" made Linux and macOS
-			// read "StreamingAssets\\contentdata.joe", a file that doesn't exist.
+			// The recreation always reads the catalog bundled in StreamingAssets
+			// and ignores zipFileBasePath: the download of contentdata.joe.gz
+			// named in the cpipe manifest can fail (no server has Disney's
+			// file), and that must not fail startup (EntitlementsStartOperation
+			// failing makes OperationStack quit the app).
+			// Path.Combine picks the platform's separator; a hard-coded "\\"
+			// made Linux and macOS read "StreamingAssets\\contentdata.joe", a
+			// file that doesn't exist.
 			ParseJoeData(Path.Combine(Application.StreamingAssetsPath, "contentdata.joe"));
 			Caller.OnContentDataDone(null);
 		}
