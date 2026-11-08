@@ -47,7 +47,7 @@ namespace Mix.Assets
 			ActiveLoadingPath = string.Empty;
 			TotalLoaded = 0;
 			MonoBehaviourEngine = aMonoBehaviour;
-			device = Singleton<SettingsManager>.Instance.GetDeviceString();
+			device = Singleton<SettingsManager>.Instance.GetBundlePlatform();
 			FileInfo fileInfo = new FileInfo(AssetManager.GetDiskCacheFilePath() + "BackgroundLoader.txt");
 			if (!fileInfo.Exists)
 			{

@@ -607,27 +607,32 @@ namespace Mix.Assets
         // Define these at the top of your AssetManager class
 #if UNITY_ANDROID && !UNITY_EDITOR
     private const string PathProtocol = "";
-    private const string BundleFolder = "AssetBundles/android/";
+    public const string BundlePlatform = "android";
 #elif UNITY_IOS && !UNITY_EDITOR
     private const string PathProtocol = "file://";
-    private const string BundleFolder = "AssetBundles/iphone/";
+    public const string BundlePlatform = "iphone";
 #elif UNITY_STANDALONE_WIN || UNITY_EDITOR
         // Specifically targets Windows or the Editor
         private const string PathProtocol = "file://";
-        private const string BundleFolder = "AssetBundles/windows64/";
+        public const string BundlePlatform = "windows64";
 #elif UNITY_STANDALONE_OSX || UNITY_EDITOR
         // Specifically targets Windows or the Editor
         private const string PathProtocol = "file://";
-        private const string BundleFolder = "AssetBundles/standalonemacos/";
+        public const string BundlePlatform = "standalonemacos";
 #elif UNITY_STANDALONE_LINUX || UNITY_EDITOR
         // Specifically targets Windows or the Editor
         private const string PathProtocol = "file://";
-        private const string BundleFolder = "AssetBundles/standalonelinux/";
+        public const string BundlePlatform = "standalonelinux64";
 #else
     // Fallback for other platforms (Mac, Linux, WebGL, etc.)
     private const string PathProtocol = "file://";
-    private const string BundleFolder = "AssetBundles/android/";
+    public const string BundlePlatform = "android";
 #endif
+        // The folder each platform's bundles live in, both in StreamingAssets
+        // and in the cpipe manifest's paths (AssetBundles/<platform>/hd/...).
+        // Linux is standalonelinux64, the folder RebuildAssetBundles writes for
+        // StandaloneLinux64.
+        private const string BundleFolder = "AssetBundles/" + BundlePlatform + "/";
 
         public static string GetStreamingFilePath(string url)
         {
@@ -1032,8 +1037,10 @@ namespace Mix.Assets
 
 		public string GetCpipePrefix(string aEntitlementPath)
 		{
-			string deviceString = Singleton<SettingsManager>.Instance.GetDeviceString();
-			aEntitlementPath = Path.Combine("AssetBundles/" + deviceString + "/hd", aEntitlementPath);
+			string bundlePlatform = Singleton<SettingsManager>.Instance.GetBundlePlatform();
+			// Manifest keys and URLs always use "/". Path.Combine alone would give
+			// "AssetBundles/windows64/hd\\..." on Windows, which no manifest lists.
+			aEntitlementPath = Path.Combine("AssetBundles/" + bundlePlatform + "/hd", aEntitlementPath).Replace('\\', '/');
 			if (aEntitlementPath.Contains("avatar") && aEntitlementPath.Contains("_sd"))
 			{
 				aEntitlementPath = aEntitlementPath.Replace("/hd/", "/sd/");

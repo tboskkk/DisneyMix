@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using Core.MetaData;
 using LitJson;
 using Mix.Assets;
@@ -68,13 +69,15 @@ namespace Mix.Data
 
 		public void OnZipFileAssetObject(string zipFileBasePath, object userData)
 		{
-			zipFileBasePath = Application.StreamingAssetsPath + "\\";
 			if (string.IsNullOrEmpty(zipFileBasePath))
 			{
 				Caller.OnContentDataDone("Error loading JOE data.");
 				return;
 			}
-			ParseJoeData(zipFileBasePath + "contentdata.joe");
+			// The catalog ships in StreamingAssets. Path.Combine picks the
+			// platform's separator; a hard-coded "\\" made Linux and macOS
+			// read "StreamingAssets\\contentdata.joe", a file that doesn't exist.
+			ParseJoeData(Path.Combine(Application.StreamingAssetsPath, "contentdata.joe"));
 			Caller.OnContentDataDone(null);
 		}
 

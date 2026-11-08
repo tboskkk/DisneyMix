@@ -119,6 +119,15 @@ public string GetDeviceString()
 #endif
 }
 
+		// The asset bundle folder for this build (AssetManager.BundlePlatform).
+		// GetDeviceString stays "iphone" on desktop for the code that relies on
+		// it, but desktop bundles are built per platform (windows64,
+		// standalonelinux64, standalonemacos), so bundle paths use this.
+		public string GetBundlePlatform()
+		{
+			return Mix.Assets.AssetManager.BundlePlatform;
+		}
+
 		public bool UseLocalPrefabs()
 		{
 			return false;
