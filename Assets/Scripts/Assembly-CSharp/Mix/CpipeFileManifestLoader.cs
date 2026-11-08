@@ -3,6 +3,7 @@ using System.Collections;
 using Disney.MobileNetwork;
 using Mix.Assets;
 using Mix.Connectivity;
+using UnityEngine;
 
 namespace Mix
 {
@@ -26,6 +27,12 @@ namespace Mix
 
 		private bool refreshing;
 
+		// A refresh to an unreachable host (packets dropped, not refused) would
+		// otherwise hold up startup for the OS connect timeout: WWW has none.
+		private const float REFRESH_TIMEOUT_SECONDS = 10f;
+
+		private bool completed;
+
 		void ITextAssetObject.TextAssetObjectComplete(string aText, object aUserData)
 		{
 			TextReady(aText, aUserData);
@@ -38,6 +45,7 @@ namespace Mix
 			this.oldVersion = oldVersion;
 
 			refreshing = !aIsFirstRun;
+			completed = false;
 
 			// Startup loads the manifest twice, as Disney's app did. The first
 			// load (from AssetManager start) uses the cached or bundled manifest
@@ -54,6 +62,7 @@ namespace Mix
 			}
 			try
 			{
+				MonoSingleton<AssetManager>.Instance.StartCoroutine(RefreshWatchdog());
 				string clientVersion = (EnvironmentManager.BundleVersion != null) ? EnvironmentManager.BundleVersion.ToString() : "0.0.0";
 				Singleton<CpipeManifestApi>.Instance.GetCpipeManifest(string.Empty, clientVersion, oldVersion, this, aCachePolicy);
 			}
@@ -62,18 +71,43 @@ namespace Mix
 				// Startup waits for this callback, so a refresh that can't even
 				// start must still report: keep the current manifest.
 				Log.Exception("Cpipe manifest refresh failed to start", exception);
-				onComplete(false);
+				Finish(false);
+			}
+		}
+
+		private IEnumerator RefreshWatchdog()
+		{
+			yield return new WaitForSecondsRealtime(REFRESH_TIMEOUT_SECONDS);
+			if (!completed)
+			{
+				Log.Exception("Cpipe manifest refresh timed out; keeping the current manifest");
+				Finish(false);
+			}
+		}
+
+		// Reports to the caller exactly once: the watchdog and the response
+		// race, and a late response must not complete the operation twice.
+		private void Finish(bool changed)
+		{
+			if (!completed)
+			{
+				completed = true;
+				onComplete(changed);
 			}
 		}
 
 		public void TextReady(string aText, object aUserData)
 		{
+			if (completed)
+			{
+				return;
+			}
 			if (aUserData != null)
 			{
 				Hashtable hashtable = (Hashtable)aUserData;
 				if ((string)hashtable["FLOW_HTTPSTATUS"] == "304")
 				{
-					onComplete(false);
+					Finish(false);
 					return;
 				}
 			}
@@ -92,7 +126,7 @@ namespace Mix
 			}
 			// A refresh that gets no manifest (no server, error status, empty
 			// body) keeps the one from the first load instead of failing boot.
-			onComplete(false);
+			Finish(false);
 		}
 
 		public bool IsLoaded()
@@ -118,7 +152,7 @@ namespace Mix
 				{
 					// Malformed server manifest: Prepare already dropped the
 					// cached copy. Keep the current manifest (CpipeUnchanged).
-					onComplete(false);
+					Finish(false);
 				}
 				else
 				{
@@ -127,7 +161,7 @@ namespace Mix
 			}
 			else
 			{
-				onComplete(true);
+				Finish(true);
 			}
 		}
 	}
