@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using Disney.MobileNetwork;
 using Mix.Assets;
 using Mix.Connectivity;
 
@@ -23,6 +24,8 @@ namespace Mix
 
 		private string ContentVersion = string.Empty;
 
+		private bool refreshing;
+
 		void ITextAssetObject.TextAssetObjectComplete(string aText, object aUserData)
 		{
 			TextReady(aText, aUserData);
@@ -34,8 +37,33 @@ namespace Mix
 			this.onError = onError;
 			this.oldVersion = oldVersion;
 
-			// CPIPE backend retired: always use bundled preload manifest.
-			PrepareManifest(null, true);
+			refreshing = !aIsFirstRun;
+
+			// Startup loads the manifest twice, as Disney's app did. The first
+			// load (from AssetManager start) uses the cached or bundled manifest
+			// (PreloadData.CpipeData): it can't use the network, because
+			// cpipeManager.cpipe is still null until it completes and
+			// AssetManager.GetCpipeUrl dereferences it. The second load comes
+			// from StartUpSequence's CpipeUpdateOperation and asks cpipe_url for
+			// the server's manifest. The response is cached under
+			// "cpipeManfiest", so the next boot's first load starts from it.
+			if (aIsFirstRun)
+			{
+				PrepareManifest(null, true);
+				return;
+			}
+			try
+			{
+				string clientVersion = (EnvironmentManager.BundleVersion != null) ? EnvironmentManager.BundleVersion.ToString() : "0.0.0";
+				Singleton<CpipeManifestApi>.Instance.GetCpipeManifest(string.Empty, clientVersion, oldVersion, this, aCachePolicy);
+			}
+			catch (Exception exception)
+			{
+				// Startup waits for this callback, so a refresh that can't even
+				// start must still report: keep the current manifest.
+				Log.Exception("Cpipe manifest refresh failed to start", exception);
+				onComplete(false);
+			}
 		}
 
 		public void TextReady(string aText, object aUserData)
@@ -62,7 +90,9 @@ namespace Mix
 					Log.Exception("No Cpipe Manifest for client version: " + ContentVersion);
 				}
 			}
-			onError("no manifest for client version " + ContentVersion);
+			// A refresh that gets no manifest (no server, error status, empty
+			// body) keeps the one from the first load instead of failing boot.
+			onComplete(false);
 		}
 
 		public bool IsLoaded()
@@ -84,7 +114,16 @@ namespace Mix
 			manifest = new CpipeFileManifest();
 			if (!manifest.Prepare(json, aFirstRun))
 			{
-				onError("error preparing manifest");
+				if (refreshing)
+				{
+					// Malformed server manifest: Prepare already dropped the
+					// cached copy. Keep the current manifest (CpipeUnchanged).
+					onComplete(false);
+				}
+				else
+				{
+					onError("error preparing manifest");
+				}
 			}
 			else
 			{
