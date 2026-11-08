@@ -127,7 +127,7 @@ namespace Mix.Ui
 				for (int num2 = recentItems.Count - 1; num2 >= 0; num2--)
 				{
 					BaseContentData myMediaTrayEntitlement = Singleton<EntitlementsManager>.Instance.GetMyMediaTrayEntitlement(recentItems[num2]);
-					if (thread == null || !(thread is IOfficialAccountChatThread) || !(myMediaTrayEntitlement is Gag))
+					if (myMediaTrayEntitlement != null && (thread == null || !(thread is IOfficialAccountChatThread) || !(myMediaTrayEntitlement is Gag)))
 					{
 						list.Add(myMediaTrayEntitlement);
 					}

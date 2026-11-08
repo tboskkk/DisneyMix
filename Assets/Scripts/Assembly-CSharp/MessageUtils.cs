@@ -35,6 +35,11 @@ public static class MessageUtils
 				}
 				string contentId = ((IStickerMessage)aChatMessage).ContentId;
 				Sticker stickerData = Singleton<EntitlementsManager>.Instance.GetStickerData(contentId);
+				if (stickerData == null)
+				{
+					// Sticker not in this build's catalog or its bundle is unavailable.
+					return string.Empty;
+				}
 				string uid = stickerData.GetUid();
 				string aToken = "ContentData.Sticker." + uid + ".PUSH_NOTE";
 				string text = Singleton<Localizer>.Instance.getString(aToken);

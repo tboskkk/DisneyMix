@@ -370,10 +370,34 @@ namespace Mix.Entitlements
 				MyStickerPacks = new List<Sticker_Pack>();
 				if (sticker_Pack != null)
 				{
-					SetVisibleAndOwnedContent(sticker_Pack, ref AllStickerPacks, ref MyStickerPacks);
+					// Packs with no available sticker are hidden (RefreshStickers
+					// already dropped the unavailable stickers).
+					RefreshStickers();
+					List<Sticker_Pack> availablePacks = sticker_Pack.FindAll((Sticker_Pack pack) => HasAvailableSticker(pack));
+					SetVisibleAndOwnedContent(availablePacks, ref AllStickerPacks, ref MyStickerPacks);
 					UpdateStickerPacksNewStatus();
 				}
 			}
+		}
+
+		// Source builds only have some of Disney's content: a pack shows only if
+		// at least one of its stickers has a bundle (AllStickers is already
+		// filtered by AssetManager.IsBundleAvailable).
+		private bool HasAvailableSticker(Sticker_Pack aPack)
+		{
+			string[] stickers = aPack.GetStickers();
+			if (stickers == null || AllStickers == null)
+			{
+				return false;
+			}
+			foreach (string aId in stickers)
+			{
+				if (AllStickers.Exists((Sticker x) => x.GetUid() == aId))
+				{
+					return true;
+				}
+			}
+			return false;
 		}
 
 		public Sticker GetStickerData(string aId)
@@ -440,7 +464,7 @@ namespace Mix.Entitlements
 				MyStickers = new List<Sticker>();
 				if (sticker != null)
 				{
-					SetVisibleAndOwnedContent(sticker, ref AllStickers, ref MyStickers);
+					SetVisibleAndOwnedContent(sticker.FindAll((Sticker x) => MonoSingleton<AssetManager>.Instance.IsBundleAvailable(x.GetHd())), ref AllStickers, ref MyStickers);
 					UpdateStickersNewStatus();
 				}
 			}
@@ -511,7 +535,7 @@ namespace Mix.Entitlements
 				MyGags = new List<Gag>();
 				if (gag != null)
 				{
-					SetVisibleAndOwnedContent(gag, ref AllGags, ref MyGags);
+					SetVisibleAndOwnedContent(gag.FindAll((Gag x) => MonoSingleton<AssetManager>.Instance.IsBundleAvailable(x.GetHd())), ref AllGags, ref MyGags);
 					UpdateGagsNewStatus();
 				}
 			}

@@ -562,6 +562,23 @@ namespace Mix.Assets
 			return false;
 		}
 
+		// True when an entitlement's bundle can be loaded: the loaded cpipe
+		// manifest lists it (the server has it) or the build ships it in
+		// StreamingAssets. Used to hide stickers and gags we can't show.
+		public bool IsBundleAvailable(string entitlementPath)
+		{
+			if (string.IsNullOrEmpty(entitlementPath))
+			{
+				return false;
+			}
+			string prefix = GetCpipePrefix(entitlementPath);
+			if (cpipeManager != null && cpipeManager.cpipe != null && !string.IsNullOrEmpty(cpipeManager.cpipe.GetFileUrl(prefix)))
+			{
+				return true;
+			}
+			return File.Exists(Path.Combine(Application.StreamingAssetsPath, prefix));
+		}
+
 		public bool IsBundleCached(string relativeCpipePath)
 		{
 			if (string.IsNullOrEmpty(relativeCpipePath))

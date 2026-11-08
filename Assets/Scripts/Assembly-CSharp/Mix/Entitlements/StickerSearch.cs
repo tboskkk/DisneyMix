@@ -291,7 +291,10 @@ namespace Mix.Entitlements
 			for (int i = 0; i < aUIDList.Count; i++)
 			{
 				Sticker stickerData = Singleton<EntitlementsManager>.Instance.GetStickerData(aUIDList[i]);
-				list.Add(stickerData);
+				if (stickerData != null)
+				{
+					list.Add(stickerData);
+				}
 			}
 			return list;
 		}

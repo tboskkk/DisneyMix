@@ -64,7 +64,7 @@ namespace Mix.Ui
 			{
 				string contentId = ((IStickerMessage)ChatMessage).ContentId;
 				Sticker stickerData = Singleton<EntitlementsManager>.Instance.GetStickerData(contentId);
-				if (stickerData.GetStickerType() == "drop")
+				if (stickerData != null && stickerData.GetStickerType() == "drop")
 				{
 					new LocalNotificationAudioDrop(stickerData);
 				}
