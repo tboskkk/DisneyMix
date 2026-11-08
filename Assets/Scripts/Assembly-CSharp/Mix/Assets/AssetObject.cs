@@ -276,7 +276,10 @@ namespace Mix.Assets
 				www.bytes.CopyTo(bytes, 0);
 			}
 			bool success = string.IsNullOrEmpty(error);
-			if (bytes.Length == 0)
+			// www.bytes is null after an HTTP error with an empty body (e.g. a
+			// 404); dereferencing it killed the coroutine and the load never
+			// finished.
+			if (bytes == null || bytes.Length == 0)
 			{
 				success = false;
 				flow.HttpStatus = 204;
