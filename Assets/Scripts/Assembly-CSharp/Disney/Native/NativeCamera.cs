@@ -7,6 +7,34 @@ namespace Disney.Native
 	{
 		private INativeCamera listener;
 
+		protected INativeCamera Listener
+		{
+			get
+			{
+				return listener;
+			}
+		}
+
+		public virtual bool IsSupported
+		{
+			get
+			{
+				return false;
+			}
+		}
+
+		public virtual void TakePhoto()
+		{
+		}
+
+		public virtual void RecordVideo()
+		{
+		}
+
+		public virtual void PickFromLibrary()
+		{
+		}
+
 		public virtual void ShowCameraOverlay(INativeCamera aListener)
 		{
 			listener = aListener;

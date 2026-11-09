@@ -383,23 +383,38 @@ namespace Mix.Ui
 
 		void INativeCamera.SendPhoto(JsonData aJsonData)
 		{
+			// TODO(upload-spec): remove when AbstractChatThread.SendPhotoMessage/SendVideoMessage are implemented
+			if (!CanSendMedia())
+			{
+				ShowCameraComingSoon();
+				return;
+			}
 			SendPhoto_003Ec__AnonStorey298 CS_0024_003C_003E8__locals10 = new SendPhoto_003Ec__AnonStorey298();
 			CS_0024_003C_003E8__locals10._003C_003Ef__this = this;
 			CS_0024_003C_003E8__locals10.localMessage = null;
-			CS_0024_003C_003E8__locals10.localMessage = chatThread.SendPhotoMessage((string)aJsonData["photoPath"], PhotoEncoding.Jpeg, (int)aJsonData["photoWidth"], (int)aJsonData["photoHeight"], actionGenerator.CreateAction(delegate(ISendPhotoMessageResult result)
+			// TODO(upload-spec): remove when AbstractChatThread.SendPhotoMessage/SendVideoMessage are implemented
+			try
 			{
-				if (!CS_0024_003C_003E8__locals10._003C_003Ef__this.IsNullOrDisposed() && CS_0024_003C_003E8__locals10._003C_003Ef__this.chatThread != null)
+				CS_0024_003C_003E8__locals10.localMessage = chatThread.SendPhotoMessage((string)aJsonData["photoPath"], PhotoEncoding.Jpeg, (int)aJsonData["photoWidth"], (int)aJsonData["photoHeight"], actionGenerator.CreateAction(delegate(ISendPhotoMessageResult result)
 				{
-					if (result == null || !result.Success)
+					if (!CS_0024_003C_003E8__locals10._003C_003Ef__this.IsNullOrDisposed() && CS_0024_003C_003E8__locals10._003C_003Ef__this.chatThread != null)
 					{
-						CS_0024_003C_003E8__locals10._003C_003Ef__this.MessageUpdateInternal(CS_0024_003C_003E8__locals10.localMessage);
+						if (result == null || !result.Success)
+						{
+							CS_0024_003C_003E8__locals10._003C_003Ef__this.MessageUpdateInternal(CS_0024_003C_003E8__locals10.localMessage);
+						}
+						else if (result != null)
+						{
+							CS_0024_003C_003E8__locals10._003C_003Ef__this.CheckAndAddTimestampForMessage(CS_0024_003C_003E8__locals10.localMessage);
+						}
 					}
-					else if (result != null)
-					{
-						CS_0024_003C_003E8__locals10._003C_003Ef__this.CheckAndAddTimestampForMessage(CS_0024_003C_003E8__locals10.localMessage);
-					}
-				}
-			}));
+				}));
+			}
+			catch (NotImplementedException)
+			{
+				ShowCameraComingSoon();
+				return;
+			}
 			ScrollView.SetScrollToBottom();
 			AddPhotoMessage(chatThread, CS_0024_003C_003E8__locals10.localMessage, true);
 			Singleton<SoundManager>.Instance.PlaySoundEvent("MainApp/UI/SFX_3_MediaMessage");
@@ -408,23 +423,38 @@ namespace Mix.Ui
 
 		void INativeCamera.SendVideo(JsonData aJsonData)
 		{
+			// TODO(upload-spec): remove when AbstractChatThread.SendPhotoMessage/SendVideoMessage are implemented
+			if (!CanSendMedia())
+			{
+				ShowCameraComingSoon();
+				return;
+			}
 			SendVideo_003Ec__AnonStorey297 CS_0024_003C_003E8__locals10 = new SendVideo_003Ec__AnonStorey297();
 			CS_0024_003C_003E8__locals10._003C_003Ef__this = this;
 			CS_0024_003C_003E8__locals10.localMessage = null;
-			CS_0024_003C_003E8__locals10.localMessage = chatThread.SendVideoMessage((string)aJsonData["videoPath"], VideoFormat.Mp4, (int)aJsonData["bitrate"], (int)aJsonData["duration"], (int)aJsonData["videoWidth"], (int)aJsonData["videoHeight"], (string)aJsonData["thumbPath"], PhotoEncoding.Jpeg, (int)aJsonData["thumbWidth"], (int)aJsonData["thumbHeight"], actionGenerator.CreateAction(delegate(ISendVideoMessageResult result)
+			// TODO(upload-spec): remove when AbstractChatThread.SendPhotoMessage/SendVideoMessage are implemented
+			try
 			{
-				if (!CS_0024_003C_003E8__locals10._003C_003Ef__this.IsNullOrDisposed() && CS_0024_003C_003E8__locals10._003C_003Ef__this.chatThread != null)
+				CS_0024_003C_003E8__locals10.localMessage = chatThread.SendVideoMessage((string)aJsonData["videoPath"], VideoFormat.Mp4, (int)aJsonData["bitrate"], (int)aJsonData["duration"], (int)aJsonData["videoWidth"], (int)aJsonData["videoHeight"], (string)aJsonData["thumbPath"], PhotoEncoding.Jpeg, (int)aJsonData["thumbWidth"], (int)aJsonData["thumbHeight"], actionGenerator.CreateAction(delegate(ISendVideoMessageResult result)
 				{
-					if (result == null || !result.Success)
+					if (!CS_0024_003C_003E8__locals10._003C_003Ef__this.IsNullOrDisposed() && CS_0024_003C_003E8__locals10._003C_003Ef__this.chatThread != null)
 					{
-						CS_0024_003C_003E8__locals10._003C_003Ef__this.MessageUpdateInternal(CS_0024_003C_003E8__locals10.localMessage);
+						if (result == null || !result.Success)
+						{
+							CS_0024_003C_003E8__locals10._003C_003Ef__this.MessageUpdateInternal(CS_0024_003C_003E8__locals10.localMessage);
+						}
+						else if (result != null)
+						{
+							CS_0024_003C_003E8__locals10._003C_003Ef__this.CheckAndAddTimestampForMessage(CS_0024_003C_003E8__locals10.localMessage);
+						}
 					}
-					else if (result != null)
-					{
-						CS_0024_003C_003E8__locals10._003C_003Ef__this.CheckAndAddTimestampForMessage(CS_0024_003C_003E8__locals10.localMessage);
-					}
-				}
-			}));
+				}));
+			}
+			catch (NotImplementedException)
+			{
+				ShowCameraComingSoon();
+				return;
+			}
 			ScrollView.SetScrollToBottom();
 			AddVideoMessage(chatThread, CS_0024_003C_003E8__locals10.localMessage, true);
 			Singleton<SoundManager>.Instance.PlaySoundEvent("MainApp/UI/SFX_3_MediaMessage");
@@ -433,6 +463,38 @@ namespace Mix.Ui
 
 		void INativeCamera.CameraError(CameraError aError)
 		{
+			string token = MediaPrep.ErrorToken(aError);
+			if (token == null)
+			{
+				return;
+			}
+			ShowCameraPanel(null, token);
+			MonoSingleton<NativeCameraManager>.Instance.Native.CloseOverlay();
+		}
+
+		// Only the onboarding fake-friend thread can store photos/videos today. A real or a
+		// new (LocalThread) conversation would queue the send and then hit the SDK's
+		// NotImplementedException later, inside a coroutine, leaving the message stuck.
+		// TODO(upload-spec): remove when uploads exist.
+		private bool CanSendMedia()
+		{
+			return chatThread is global::Mix.FakeFriend.Datatypes.FakeThread;
+		}
+
+		private void ShowCameraComingSoon()
+		{
+			ShowCameraPanel("chatmixscreen.cameratray.comingsoontext", null);
+		}
+
+		private void ShowCameraPanel(string aTitleToken, string aMessageToken)
+		{
+			GenericPanel genericPanel = (GenericPanel)Singleton<PanelManager>.Instance.ShowPanel(Panels.GENERIC);
+			Singleton<PanelManager>.Instance.SetupTokens(new Dictionary<Text, string>
+			{
+				{ genericPanel.TitleText, aTitleToken },
+				{ genericPanel.MessageText, aMessageToken },
+				{ genericPanel.ButtonOneText, "customtokens.panels.button_ok" }
+			});
 		}
 
 		void IMediaTray.OnEntitlementClicked(BaseContentData aEntitlement)
@@ -1038,7 +1100,7 @@ namespace Mix.Ui
 		{
 			MediaBar.Init(this, chatThread);
 			MediaTray.Init(this, chatThread);
-			CameraTray.Init(this);
+			CameraTray.Init(this, CanSendMedia, ShowCameraComingSoon);
 			ChatBar.Init(this, chatThread);
 			BottomNav.Init(this);
 			if (chatThread is IOfficialAccountChatThread)

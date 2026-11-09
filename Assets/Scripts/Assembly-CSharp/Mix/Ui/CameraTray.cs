@@ -1,6 +1,7 @@
-using System.Collections.Generic;
+using System;
 using Disney.Native;
 using UnityEngine;
+using UnityEngine.Events;
 using UnityEngine.UI;
 
 namespace Mix.Ui
@@ -11,11 +12,55 @@ namespace Mix.Ui
 
 		private INativeCamera listener;
 
+		private Func<bool> canSendMedia;
+
+		private Action onMediaUnavailable;
+
 		private bool isActive;
 
-		public void Init(INativeCamera aListener)
+		// aCanSendMedia is checked on every tap, before the camera opens, so a user is never
+		// sent to take a photo that the current conversation cannot send.
+		public void Init(INativeCamera aListener, Func<bool> aCanSendMedia, Action aOnMediaUnavailable)
 		{
 			listener = aListener;
+			canSendMedia = aCanSendMedia;
+			onMediaUnavailable = aOnMediaUnavailable;
+			// `var`: a global-namespace NativeCamera (the plugin) shadows Disney.Native.NativeCamera by name here.
+			var camera = MonoSingleton<NativeCameraManager>.Instance.Native;
+			if (camera == null || !camera.IsSupported)
+			{
+				return;
+			}
+			Transform root = base.transform.Find("ComingSoon");
+			if (root == null)
+			{
+				Debug.LogWarning("CameraTray: missing ComingSoon");
+				return;
+			}
+			SetActive(root, "ComingSoonText", false);
+			Wire(root, "PhotoBtn", delegate
+			{
+				if (MediaAvailable())
+				{
+					camera.ShowCameraOverlay(listener);
+					camera.TakePhoto();
+				}
+			});
+			// Photos only for now: video playback has no working player (see iceberg/video-playback-wip).
+			SetActive(root, "VideoBtn", false);
+			Wire(root, "LibraryBtn", delegate
+			{
+				if (MediaAvailable())
+				{
+					camera.ShowCameraOverlay(listener);
+					camera.PickFromLibrary();
+				}
+			});
+			if (!global::NativeCamera.DeviceHasCamera())
+			{
+				SetActive(root, "PhotoBtn", false);
+				SetActive(root, "VideoBtn", false);
+			}
 		}
 
 		public void UpdateState(bool aState)
@@ -23,49 +68,60 @@ namespace Mix.Ui
 			base.gameObject.SetActive(aState);
 		}
 
-		private void RequestPermissions()
+		// The shipped prefab has these buttons disabled and faded for the "coming soon"
+		// look; a disabled Button never fires onClick.
+		public static void MakeButtonLive(Transform aButton)
 		{
-			List<string> list = new List<string>();
-			list.Add("record_audio");
-			list.Add("camera");
-			list.Add("write_external_storage");
-			List<string> aPermnissions = list;
-			if (MonoSingleton<NativeUtilitiesManager>.Instance.Native.HasPermissions(aPermnissions))
+			Button button = aButton.GetComponent<Button>();
+			if (button != null)
 			{
-				UserHasPermission();
+				button.interactable = true;
 			}
-			else if (!MonoSingleton<NativeUtilitiesManager>.Instance.Native.AskForPermissions(aPermnissions, OnPermissionResult))
+			Graphic[] graphics = aButton.GetComponentsInChildren<Graphic>(true);
+			foreach (Graphic graphic in graphics)
 			{
-				UserDoesntHavePermission();
-			}
-		}
-
-		private void OnPermissionResult(NativeUtilitiesPermissionResult aResult)
-		{
-			if (aResult.HasPermission)
-			{
-				UserHasPermission();
-			}
-			else
-			{
-				UserDoesntHavePermission();
+				Color color = graphic.color;
+				color.a = 1f;
+				graphic.color = color;
 			}
 		}
 
-		private void UserHasPermission()
+		private bool MediaAvailable()
 		{
-			MonoSingleton<NativeCameraManager>.Instance.Native.ShowCameraOverlay(listener);
+			if (canSendMedia == null || canSendMedia())
+			{
+				return true;
+			}
+			if (onMediaUnavailable != null)
+			{
+				onMediaUnavailable();
+			}
+			return false;
 		}
 
-		private void UserDoesntHavePermission()
+		private static void SetActive(Transform root, string childName, bool active)
 		{
-			GenericPanel genericPanel = (GenericPanel)Singleton<PanelManager>.Instance.ShowPanel(Panels.GENERIC);
-			Singleton<PanelManager>.Instance.SetupTokens(new Dictionary<Text, string>
+			Transform child = root.Find(childName);
+			if (child == null)
 			{
-				{ genericPanel.TitleText, null },
-				{ genericPanel.MessageText, "customtokens.panels.enable_camera" },
-				{ genericPanel.ButtonOneText, "customtokens.panels.button_ok" }
-			});
+				Debug.LogWarning("CameraTray: missing " + root.name + "/" + childName);
+				return;
+			}
+			child.gameObject.SetActive(active);
+		}
+
+		private static void Wire(Transform root, string childName, UnityAction action)
+		{
+			Transform child = root.Find(childName);
+			Button button = ((child != null) ? child.GetComponent<Button>() : null);
+			if (button == null)
+			{
+				Debug.LogWarning("CameraTray: missing button " + root.name + "/" + childName);
+				return;
+			}
+			MakeButtonLive(child);
+			button.onClick.RemoveAllListeners();
+			button.onClick.AddListener(action);
 		}
 	}
 }
