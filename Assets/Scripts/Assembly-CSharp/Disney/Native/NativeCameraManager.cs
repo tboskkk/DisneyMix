@@ -20,7 +20,12 @@ namespace Disney.Native
 
 		protected void Awake()
 		{
-			native = base.gameObject.AddComponent<NativeAndroidCamera>();
+#if UNITY_ANDROID || UNITY_EDITOR
+			native = base.gameObject.AddComponent<AndroidCameraBridge>();
+#else
+			native = base.gameObject.AddComponent<NativeCamera>();
+#endif
+			MediaPrep.ClearCache(MediaPrep.CacheDir);
 		}
 
 		public void Init()
