@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Disney.Mix.SDK;
+using Disney.Native;
 using Mix.Entitlements;
 using Mix.Session.Extensions;
 using UnityEngine;
@@ -63,8 +64,27 @@ namespace Mix.Ui
 			}
 		}
 
+		// Disney shipped the Media (camera) tab switched off in the prefab and nothing turns it on.
+		// It must be active before Start() collects the toggles (that ignores inactive children).
+		public static bool ShowMediaTab(Transform aMediaBar)
+		{
+			Transform media = aMediaBar.Find("Media");
+			if (media == null)
+			{
+				return false;
+			}
+			media.gameObject.SetActive(true);
+			return true;
+		}
+
 		private void Start()
 		{
+			// `var`: a global-namespace NativeCamera (the plugin) shadows Disney.Native.NativeCamera by name.
+			var camera = MonoSingleton<NativeCameraManager>.Instance.Native;
+			if (camera != null && camera.IsSupported)
+			{
+				ShowMediaTab(base.transform);
+			}
 			toggleGroup = GetComponent<ToggleGroup>();
 			Toggle[] toggleArray = base.transform.GetComponentsInChildren<Toggle>();
 			for (int i = 0; i < toggleArray.Length; i++)

@@ -35,4 +35,26 @@ public class CameraTrayTests
 			PrefabUtility.UnloadPrefabContents(root);
 		}
 	}
+
+	// Disney shipped the Media (camera) tab switched off in the prefab and nothing in the
+	// code turns it on, so the tray was unreachable.
+	[Test]
+	public void ShowMediaTab_OnTheRealPrefab_ActivatesTheHiddenMediaToggle()
+	{
+		GameObject root = PrefabUtility.LoadPrefabContents(PrefabPath);
+		try
+		{
+			Transform bar = root.transform.Find("UI_FG_Holder/UI_FG_ChatScreen/MediaInput/MediaBar");
+			Assert.IsNotNull(bar);
+			Assert.IsFalse(bar.Find("Media").gameObject.activeSelf, "precondition: the prefab ships the Media tab hidden");
+			Assert.IsTrue(MediaBar.ShowMediaTab(bar));
+			Assert.IsTrue(bar.Find("Media").gameObject.activeSelf);
+			Assert.IsNotNull(bar.Find("Media").GetComponent<Toggle>());
+			Assert.IsFalse(MediaBar.ShowMediaTab(bar.Find("Keyboard")), "no Media child: nothing to show");
+		}
+		finally
+		{
+			PrefabUtility.UnloadPrefabContents(root);
+		}
+	}
 }
