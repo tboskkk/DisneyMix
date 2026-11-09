@@ -1,6 +1,6 @@
-using System.Collections.Generic;
 using Disney.Native;
 using UnityEngine;
+using UnityEngine.Events;
 using UnityEngine.UI;
 
 namespace Mix.Ui
@@ -16,6 +16,39 @@ namespace Mix.Ui
 		public void Init(INativeCamera aListener)
 		{
 			listener = aListener;
+			// `var`: a global-namespace NativeCamera (the plugin) shadows Disney.Native.NativeCamera by name here.
+			var camera = MonoSingleton<NativeCameraManager>.Instance.Native;
+			if (camera == null || !camera.IsSupported)
+			{
+				return;
+			}
+			Transform root = base.transform.Find("ComingSoon");
+			if (root == null)
+			{
+				Debug.LogWarning("CameraTray: missing ComingSoon");
+				return;
+			}
+			SetActive(root, "ComingSoonText", false);
+			Wire(root, "PhotoBtn", delegate
+			{
+				camera.ShowCameraOverlay(listener);
+				camera.TakePhoto();
+			});
+			Wire(root, "VideoBtn", delegate
+			{
+				camera.ShowCameraOverlay(listener);
+				camera.RecordVideo();
+			});
+			Wire(root, "LibraryBtn", delegate
+			{
+				camera.ShowCameraOverlay(listener);
+				camera.PickFromLibrary();
+			});
+			if (!global::NativeCamera.DeviceHasCamera())
+			{
+				SetActive(root, "PhotoBtn", false);
+				SetActive(root, "VideoBtn", false);
+			}
 		}
 
 		public void UpdateState(bool aState)
@@ -23,49 +56,28 @@ namespace Mix.Ui
 			base.gameObject.SetActive(aState);
 		}
 
-		private void RequestPermissions()
+		private static void SetActive(Transform root, string childName, bool active)
 		{
-			List<string> list = new List<string>();
-			list.Add("record_audio");
-			list.Add("camera");
-			list.Add("write_external_storage");
-			List<string> aPermnissions = list;
-			if (MonoSingleton<NativeUtilitiesManager>.Instance.Native.HasPermissions(aPermnissions))
+			Transform child = root.Find(childName);
+			if (child == null)
 			{
-				UserHasPermission();
+				Debug.LogWarning("CameraTray: missing " + root.name + "/" + childName);
+				return;
 			}
-			else if (!MonoSingleton<NativeUtilitiesManager>.Instance.Native.AskForPermissions(aPermnissions, OnPermissionResult))
-			{
-				UserDoesntHavePermission();
-			}
+			child.gameObject.SetActive(active);
 		}
 
-		private void OnPermissionResult(NativeUtilitiesPermissionResult aResult)
+		private static void Wire(Transform root, string childName, UnityAction action)
 		{
-			if (aResult.HasPermission)
+			Transform child = root.Find(childName);
+			Button button = ((child != null) ? child.GetComponent<Button>() : null);
+			if (button == null)
 			{
-				UserHasPermission();
+				Debug.LogWarning("CameraTray: missing button " + root.name + "/" + childName);
+				return;
 			}
-			else
-			{
-				UserDoesntHavePermission();
-			}
-		}
-
-		private void UserHasPermission()
-		{
-			MonoSingleton<NativeCameraManager>.Instance.Native.ShowCameraOverlay(listener);
-		}
-
-		private void UserDoesntHavePermission()
-		{
-			GenericPanel genericPanel = (GenericPanel)Singleton<PanelManager>.Instance.ShowPanel(Panels.GENERIC);
-			Singleton<PanelManager>.Instance.SetupTokens(new Dictionary<Text, string>
-			{
-				{ genericPanel.TitleText, null },
-				{ genericPanel.MessageText, "customtokens.panels.enable_camera" },
-				{ genericPanel.ButtonOneText, "customtokens.panels.button_ok" }
-			});
+			button.onClick.RemoveAllListeners();
+			button.onClick.AddListener(action);
 		}
 	}
 }

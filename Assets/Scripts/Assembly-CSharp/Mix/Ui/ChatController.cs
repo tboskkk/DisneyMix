@@ -386,20 +386,29 @@ namespace Mix.Ui
 			SendPhoto_003Ec__AnonStorey298 CS_0024_003C_003E8__locals10 = new SendPhoto_003Ec__AnonStorey298();
 			CS_0024_003C_003E8__locals10._003C_003Ef__this = this;
 			CS_0024_003C_003E8__locals10.localMessage = null;
-			CS_0024_003C_003E8__locals10.localMessage = chatThread.SendPhotoMessage((string)aJsonData["photoPath"], PhotoEncoding.Jpeg, (int)aJsonData["photoWidth"], (int)aJsonData["photoHeight"], actionGenerator.CreateAction(delegate(ISendPhotoMessageResult result)
+			// TODO(upload-spec): remove when AbstractChatThread.SendPhotoMessage/SendVideoMessage are implemented
+			try
 			{
-				if (!CS_0024_003C_003E8__locals10._003C_003Ef__this.IsNullOrDisposed() && CS_0024_003C_003E8__locals10._003C_003Ef__this.chatThread != null)
+				CS_0024_003C_003E8__locals10.localMessage = chatThread.SendPhotoMessage((string)aJsonData["photoPath"], PhotoEncoding.Jpeg, (int)aJsonData["photoWidth"], (int)aJsonData["photoHeight"], actionGenerator.CreateAction(delegate(ISendPhotoMessageResult result)
 				{
-					if (result == null || !result.Success)
+					if (!CS_0024_003C_003E8__locals10._003C_003Ef__this.IsNullOrDisposed() && CS_0024_003C_003E8__locals10._003C_003Ef__this.chatThread != null)
 					{
-						CS_0024_003C_003E8__locals10._003C_003Ef__this.MessageUpdateInternal(CS_0024_003C_003E8__locals10.localMessage);
+						if (result == null || !result.Success)
+						{
+							CS_0024_003C_003E8__locals10._003C_003Ef__this.MessageUpdateInternal(CS_0024_003C_003E8__locals10.localMessage);
+						}
+						else if (result != null)
+						{
+							CS_0024_003C_003E8__locals10._003C_003Ef__this.CheckAndAddTimestampForMessage(CS_0024_003C_003E8__locals10.localMessage);
+						}
 					}
-					else if (result != null)
-					{
-						CS_0024_003C_003E8__locals10._003C_003Ef__this.CheckAndAddTimestampForMessage(CS_0024_003C_003E8__locals10.localMessage);
-					}
-				}
-			}));
+				}));
+			}
+			catch (NotImplementedException)
+			{
+				ShowCameraComingSoon();
+				return;
+			}
 			ScrollView.SetScrollToBottom();
 			AddPhotoMessage(chatThread, CS_0024_003C_003E8__locals10.localMessage, true);
 			Singleton<SoundManager>.Instance.PlaySoundEvent("MainApp/UI/SFX_3_MediaMessage");
@@ -411,20 +420,29 @@ namespace Mix.Ui
 			SendVideo_003Ec__AnonStorey297 CS_0024_003C_003E8__locals10 = new SendVideo_003Ec__AnonStorey297();
 			CS_0024_003C_003E8__locals10._003C_003Ef__this = this;
 			CS_0024_003C_003E8__locals10.localMessage = null;
-			CS_0024_003C_003E8__locals10.localMessage = chatThread.SendVideoMessage((string)aJsonData["videoPath"], VideoFormat.Mp4, (int)aJsonData["bitrate"], (int)aJsonData["duration"], (int)aJsonData["videoWidth"], (int)aJsonData["videoHeight"], (string)aJsonData["thumbPath"], PhotoEncoding.Jpeg, (int)aJsonData["thumbWidth"], (int)aJsonData["thumbHeight"], actionGenerator.CreateAction(delegate(ISendVideoMessageResult result)
+			// TODO(upload-spec): remove when AbstractChatThread.SendPhotoMessage/SendVideoMessage are implemented
+			try
 			{
-				if (!CS_0024_003C_003E8__locals10._003C_003Ef__this.IsNullOrDisposed() && CS_0024_003C_003E8__locals10._003C_003Ef__this.chatThread != null)
+				CS_0024_003C_003E8__locals10.localMessage = chatThread.SendVideoMessage((string)aJsonData["videoPath"], VideoFormat.Mp4, (int)aJsonData["bitrate"], (int)aJsonData["duration"], (int)aJsonData["videoWidth"], (int)aJsonData["videoHeight"], (string)aJsonData["thumbPath"], PhotoEncoding.Jpeg, (int)aJsonData["thumbWidth"], (int)aJsonData["thumbHeight"], actionGenerator.CreateAction(delegate(ISendVideoMessageResult result)
 				{
-					if (result == null || !result.Success)
+					if (!CS_0024_003C_003E8__locals10._003C_003Ef__this.IsNullOrDisposed() && CS_0024_003C_003E8__locals10._003C_003Ef__this.chatThread != null)
 					{
-						CS_0024_003C_003E8__locals10._003C_003Ef__this.MessageUpdateInternal(CS_0024_003C_003E8__locals10.localMessage);
+						if (result == null || !result.Success)
+						{
+							CS_0024_003C_003E8__locals10._003C_003Ef__this.MessageUpdateInternal(CS_0024_003C_003E8__locals10.localMessage);
+						}
+						else if (result != null)
+						{
+							CS_0024_003C_003E8__locals10._003C_003Ef__this.CheckAndAddTimestampForMessage(CS_0024_003C_003E8__locals10.localMessage);
+						}
 					}
-					else if (result != null)
-					{
-						CS_0024_003C_003E8__locals10._003C_003Ef__this.CheckAndAddTimestampForMessage(CS_0024_003C_003E8__locals10.localMessage);
-					}
-				}
-			}));
+				}));
+			}
+			catch (NotImplementedException)
+			{
+				ShowCameraComingSoon();
+				return;
+			}
 			ScrollView.SetScrollToBottom();
 			AddVideoMessage(chatThread, CS_0024_003C_003E8__locals10.localMessage, true);
 			Singleton<SoundManager>.Instance.PlaySoundEvent("MainApp/UI/SFX_3_MediaMessage");
@@ -433,6 +451,29 @@ namespace Mix.Ui
 
 		void INativeCamera.CameraError(CameraError aError)
 		{
+			string token = MediaPrep.ErrorToken(aError);
+			if (token == null)
+			{
+				return;
+			}
+			ShowCameraPanel(null, token);
+			MonoSingleton<NativeCameraManager>.Instance.Native.CloseOverlay();
+		}
+
+		private void ShowCameraComingSoon()
+		{
+			ShowCameraPanel("chatmixscreen.cameratray.comingsoontext", null);
+		}
+
+		private void ShowCameraPanel(string aTitleToken, string aMessageToken)
+		{
+			GenericPanel genericPanel = (GenericPanel)Singleton<PanelManager>.Instance.ShowPanel(Panels.GENERIC);
+			Singleton<PanelManager>.Instance.SetupTokens(new Dictionary<Text, string>
+			{
+				{ genericPanel.TitleText, aTitleToken },
+				{ genericPanel.MessageText, aMessageToken },
+				{ genericPanel.ButtonOneText, "customtokens.panels.button_ok" }
+			});
 		}
 
 		void IMediaTray.OnEntitlementClicked(BaseContentData aEntitlement)

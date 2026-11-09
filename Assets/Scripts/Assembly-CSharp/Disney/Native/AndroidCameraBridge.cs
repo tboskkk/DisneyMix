@@ -170,7 +170,10 @@ namespace Disney.Native
 				int thumbWidth = thumb.width;
 				int thumbHeight = thumb.height;
 				string thumbPath = MediaPrep.WriteJpeg(thumb, MediaPrep.CacheDir);
-				OnSendVideo(MediaPrep.VideoJson(path, MediaPrep.Bitrate(bytes, props.duration), props.duration, videoWidth, videoHeight, thumbPath, thumbWidth, thumbHeight));
+				// PRIVACY: unlike photos (re-encoded, so EXIF/GPS is dropped), the video file is sent on
+				// as-is and its container metadata can include location. Whatever uploads it MUST strip
+				// that metadata (remux/transcode, e.g. MediaMuxer or server-side) before it leaves the device.
+				OnSendVideo(MediaPrep.VideoJson(path,MediaPrep.Bitrate(bytes, props.duration), props.duration, videoWidth, videoHeight, thumbPath, thumbWidth, thumbHeight));
 			}
 			catch (Exception e)
 			{
