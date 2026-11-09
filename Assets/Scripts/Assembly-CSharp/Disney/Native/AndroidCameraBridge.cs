@@ -51,32 +51,20 @@ namespace Disney.Native
 			{
 				return;
 			}
-			NativeGallery.GetMixedMediaFromGallery(delegate(string path)
+			NativeGallery.GetImageFromGallery(delegate(string path)
 			{
 				gate.Exit();
 				if (string.IsNullOrEmpty(path))
 				{
 					// A cancel is silent, but on Android 6-12 a denied storage permission also gives null.
-					if (!NativeGallery.CheckPermission(NativeGallery.PermissionType.Read, NativeGallery.MediaType.Image | NativeGallery.MediaType.Video))
+					if (!NativeGallery.CheckPermission(NativeGallery.PermissionType.Read, NativeGallery.MediaType.Image))
 					{
 						Fail(CameraError.PERMISSION_DENIED);
 					}
 					return;
 				}
-				NativeGallery.MediaType type = NativeGallery.GetMediaTypeOfFile(path);
-				if ((type & NativeGallery.MediaType.Video) != 0)
-				{
-					OnVideoPath(path, false);
-				}
-				else if ((type & NativeGallery.MediaType.Image) != 0)
-				{
-					OnPhotoPath(path, false);
-				}
-				else
-				{
-					Fail(CameraError.DECODE_FAILED);
-				}
-			}, NativeGallery.MediaType.Image | NativeGallery.MediaType.Video);
+				OnPhotoPath(path, false);
+			});
 		}
 
 		// The plugins' own IsBusy() is hard-wired to false on Android, so this keeps a

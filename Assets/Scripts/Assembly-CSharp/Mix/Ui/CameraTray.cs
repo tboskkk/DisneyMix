@@ -46,14 +46,8 @@ namespace Mix.Ui
 					camera.TakePhoto();
 				}
 			});
-			Wire(root, "VideoBtn", delegate
-			{
-				if (MediaAvailable())
-				{
-					camera.ShowCameraOverlay(listener);
-					camera.RecordVideo();
-				}
-			});
+			// Photos only for now: video playback has no working player (see iceberg/video-playback-wip).
+			SetActive(root, "VideoBtn", false);
 			Wire(root, "LibraryBtn", delegate
 			{
 				if (MediaAvailable())
