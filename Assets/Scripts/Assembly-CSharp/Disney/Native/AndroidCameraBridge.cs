@@ -11,6 +11,8 @@ namespace Disney.Native
 	// here is the Disney.Native base class.
 	public class AndroidCameraBridge : NativeCamera
 	{
+		private readonly MediaGate gate = new MediaGate();
+
 		public override bool IsSupported
 		{
 			get
@@ -21,7 +23,7 @@ namespace Disney.Native
 
 		public override void TakePhoto()
 		{
-			if (IsBusy())
+			if (!TryBegin())
 			{
 				return;
 			}
@@ -33,7 +35,7 @@ namespace Disney.Native
 
 		public override void RecordVideo()
 		{
-			if (IsBusy())
+			if (!TryBegin())
 			{
 				return;
 			}
@@ -45,14 +47,20 @@ namespace Disney.Native
 
 		public override void PickFromLibrary()
 		{
-			if (IsBusy())
+			if (!TryBegin())
 			{
 				return;
 			}
 			NativeGallery.GetMixedMediaFromGallery(delegate(string path)
 			{
+				gate.Exit();
 				if (string.IsNullOrEmpty(path))
 				{
+					// A cancel is silent, but on Android 6-12 a denied storage permission also gives null.
+					if (!NativeGallery.CheckPermission(NativeGallery.PermissionType.Read, NativeGallery.MediaType.Image | NativeGallery.MediaType.Video))
+					{
+						Fail(CameraError.PERMISSION_DENIED);
+					}
 					return;
 				}
 				NativeGallery.MediaType type = NativeGallery.GetMediaTypeOfFile(path);
@@ -71,9 +79,15 @@ namespace Disney.Native
 			}, NativeGallery.MediaType.Image | NativeGallery.MediaType.Video);
 		}
 
-		private static bool IsBusy()
+		// The plugins' own IsBusy() is hard-wired to false on Android, so this keeps a
+		// second tap (or Photo then Library) from launching a second activity.
+		private bool TryBegin()
 		{
-			return global::NativeCamera.IsCameraBusy() || NativeGallery.IsMediaPickerBusy();
+			if (global::NativeCamera.IsCameraBusy() || NativeGallery.IsMediaPickerBusy())
+			{
+				return false;
+			}
+			return gate.TryEnter(Time.realtimeSinceStartup);
 		}
 
 		private void Fail(CameraError error)
@@ -84,8 +98,22 @@ namespace Disney.Native
 			}
 		}
 
+		// Delivery is separate from decoding so a failure inside the chat (which already
+		// logs) is not mis-reported to the user as a decode error.
+		private static void Deliver(Action send)
+		{
+			try
+			{
+				send();
+			}
+			catch (Exception e)
+			{
+				Debug.LogException(e);
+			}
+		}
+
 		// A null path from the camera is either a cancel (silent) or a denied
-		// permission (tell the user); the picker needs no permission.
+		// permission (tell the user).
 		private bool HandleNullPath(string path, bool fromCamera, bool isPicture)
 		{
 			if (!string.IsNullOrEmpty(path))
@@ -101,10 +129,12 @@ namespace Disney.Native
 
 		private void OnPhotoPath(string path, bool fromCamera)
 		{
+			gate.Exit();
 			if (HandleNullPath(path, fromCamera, true))
 			{
 				return;
 			}
+			string json;
 			Texture2D tex = null;
 			try
 			{
@@ -117,12 +147,13 @@ namespace Disney.Native
 				int width = tex.width;
 				int height = tex.height;
 				string jpegPath = MediaPrep.WriteJpeg(tex, MediaPrep.CacheDir);
-				OnSendPhoto(MediaPrep.PhotoJson(jpegPath, width, height));
+				json = MediaPrep.PhotoJson(jpegPath, width, height);
 			}
 			catch (Exception e)
 			{
 				Debug.LogException(e);
 				Fail(CameraError.DECODE_FAILED);
+				return;
 			}
 			finally
 			{
@@ -131,20 +162,26 @@ namespace Disney.Native
 					Destroy(tex);
 				}
 			}
+			Deliver(delegate
+			{
+				OnSendPhoto(json);
+			});
 		}
 
 		private void OnVideoPath(string path, bool fromCamera)
 		{
+			gate.Exit();
 			if (HandleNullPath(path, fromCamera, false))
 			{
 				return;
 			}
+			string json;
 			Texture2D thumb = null;
 			try
 			{
 				long bytes = new FileInfo(path).Length;
 				global::NativeCamera.VideoProperties props = global::NativeCamera.GetVideoProperties(path);
-				switch (MediaPrep.CheckVideo(bytes, props.duration))
+				switch (MediaPrep.CheckVideo(bytes, props.duration, fromCamera))
 				{
 				case VideoCheck.TooLong:
 					Fail(CameraError.VIDEO_TOO_LONG);
@@ -170,15 +207,16 @@ namespace Disney.Native
 				int thumbWidth = thumb.width;
 				int thumbHeight = thumb.height;
 				string thumbPath = MediaPrep.WriteJpeg(thumb, MediaPrep.CacheDir);
-				// PRIVACY: unlike photos (re-encoded, so EXIF/GPS is dropped), the video file is sent on
-				// as-is and its container metadata can include location. Whatever uploads it MUST strip
-				// that metadata (remux/transcode, e.g. MediaMuxer or server-side) before it leaves the device.
-				OnSendVideo(MediaPrep.VideoJson(path,MediaPrep.Bitrate(bytes, props.duration), props.duration, videoWidth, videoHeight, thumbPath, thumbWidth, thumbHeight));
+				// The plugins reuse fixed file names (VID_camera.mp4, pickedMedia.*), so keep our own copy.
+				string extension = Path.GetExtension(path);
+				string videoPath = MediaPrep.CopyToCache(path, MediaPrep.CacheDir, string.IsNullOrEmpty(extension) ? ".mp4" : extension);
+				json = MediaPrep.VideoJson(videoPath, MediaPrep.Bitrate(bytes, props.duration), props.duration, videoWidth, videoHeight, thumbPath, thumbWidth, thumbHeight);
 			}
 			catch (Exception e)
 			{
 				Debug.LogException(e);
 				Fail(CameraError.DECODE_FAILED);
+				return;
 			}
 			finally
 			{
@@ -187,6 +225,13 @@ namespace Disney.Native
 					Destroy(thumb);
 				}
 			}
+			// PRIVACY: unlike photos (re-encoded, so EXIF/GPS is dropped), the video file is sent on
+			// as-is and its container metadata can include location. Whatever uploads it MUST strip
+			// that metadata (remux/transcode, e.g. MediaMuxer or server-side) before it leaves the device.
+			Deliver(delegate
+			{
+				OnSendVideo(json);
+			});
 		}
 	}
 }

@@ -103,4 +103,71 @@ public class MediaPrepTests
 		MediaPrep.ClearCache(dir);
 		UnityEngine.Object.DestroyImmediate(tex);
 	}
+
+	[Test]
+	public void CheckVideo_Camera_ToleratesRecorderOvershoot()
+	{
+		Assert.AreEqual(VideoCheck.Ok, MediaPrep.CheckVideo(MediaPrep.MaxVideoBytes + MediaPrep.CameraSizeSlackBytes, 30000 + MediaPrep.CameraDurationSlackMs, true));
+		Assert.AreEqual(VideoCheck.TooLong, MediaPrep.CheckVideo(1, 30000 + MediaPrep.CameraDurationSlackMs + 1, true));
+		Assert.AreEqual(VideoCheck.TooLarge, MediaPrep.CheckVideo(MediaPrep.MaxVideoBytes + MediaPrep.CameraSizeSlackBytes + 1, 1000, true));
+		Assert.AreEqual(VideoCheck.TooLong, MediaPrep.CheckVideo(1, 30001, false));
+		Assert.AreEqual(VideoCheck.TooLarge, MediaPrep.CheckVideo(MediaPrep.MaxVideoBytes + 1, 1000));
+	}
+
+	[Test]
+	public void MediaGate_BlocksReentry_UntilExitOrTimeout()
+	{
+		MediaGate gate = new MediaGate();
+		Assert.IsTrue(gate.TryEnter(0f));
+		Assert.IsFalse(gate.TryEnter(1f));
+		gate.Exit();
+		Assert.IsTrue(gate.TryEnter(1f));
+		Assert.IsFalse(gate.TryEnter(2f));
+		Assert.IsTrue(gate.TryEnter(1f + MediaGate.TimeoutSeconds + 0.1f));
+	}
+
+	[Test]
+	public void CopyToCache_CopiesBytesToANewUniqueFile()
+	{
+		string src = Path.Combine(Path.GetTempPath(), "mixmedia-src-" + Guid.NewGuid() + ".mp4");
+		string dir = Path.Combine(Path.GetTempPath(), "mixmedia-copy-" + Guid.NewGuid());
+		try
+		{
+			File.WriteAllBytes(src, new byte[] { 1, 2, 3, 4 });
+			string a = MediaPrep.CopyToCache(src, dir, ".mp4");
+			string b = MediaPrep.CopyToCache(src, dir, ".mp4");
+			Assert.AreNotEqual(src, a);
+			Assert.AreNotEqual(a, b);
+			Assert.IsTrue(a.EndsWith(".mp4"));
+			CollectionAssert.AreEqual(new byte[] { 1, 2, 3, 4 }, File.ReadAllBytes(a));
+		}
+		finally
+		{
+			File.Delete(src);
+			MediaPrep.ClearCache(dir);
+		}
+	}
+
+	[Test]
+	public void PruneCache_RemovesOldFiles_KeepsRecentOnes()
+	{
+		string dir = Path.Combine(Path.GetTempPath(), "mixmedia-prune-" + Guid.NewGuid());
+		try
+		{
+			Directory.CreateDirectory(dir);
+			string oldFile = Path.Combine(dir, "old.jpg");
+			string newFile = Path.Combine(dir, "new.jpg");
+			File.WriteAllBytes(oldFile, new byte[] { 1 });
+			File.WriteAllBytes(newFile, new byte[] { 1 });
+			File.SetLastWriteTimeUtc(oldFile, DateTime.UtcNow - TimeSpan.FromDays(8));
+			MediaPrep.PruneCache(dir, TimeSpan.FromDays(7));
+			Assert.IsFalse(File.Exists(oldFile));
+			Assert.IsTrue(File.Exists(newFile));
+			MediaPrep.PruneCache(Path.Combine(dir, "missing"), TimeSpan.FromDays(7));
+		}
+		finally
+		{
+			MediaPrep.ClearCache(dir);
+		}
+	}
 }

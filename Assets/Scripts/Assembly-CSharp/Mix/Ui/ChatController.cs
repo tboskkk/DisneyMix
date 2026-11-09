@@ -383,6 +383,12 @@ namespace Mix.Ui
 
 		void INativeCamera.SendPhoto(JsonData aJsonData)
 		{
+			// TODO(upload-spec): remove when AbstractChatThread.SendPhotoMessage/SendVideoMessage are implemented
+			if (!CanSendMedia())
+			{
+				ShowCameraComingSoon();
+				return;
+			}
 			SendPhoto_003Ec__AnonStorey298 CS_0024_003C_003E8__locals10 = new SendPhoto_003Ec__AnonStorey298();
 			CS_0024_003C_003E8__locals10._003C_003Ef__this = this;
 			CS_0024_003C_003E8__locals10.localMessage = null;
@@ -417,6 +423,12 @@ namespace Mix.Ui
 
 		void INativeCamera.SendVideo(JsonData aJsonData)
 		{
+			// TODO(upload-spec): remove when AbstractChatThread.SendPhotoMessage/SendVideoMessage are implemented
+			if (!CanSendMedia())
+			{
+				ShowCameraComingSoon();
+				return;
+			}
 			SendVideo_003Ec__AnonStorey297 CS_0024_003C_003E8__locals10 = new SendVideo_003Ec__AnonStorey297();
 			CS_0024_003C_003E8__locals10._003C_003Ef__this = this;
 			CS_0024_003C_003E8__locals10.localMessage = null;
@@ -458,6 +470,15 @@ namespace Mix.Ui
 			}
 			ShowCameraPanel(null, token);
 			MonoSingleton<NativeCameraManager>.Instance.Native.CloseOverlay();
+		}
+
+		// Only the onboarding fake-friend thread can store photos/videos today. A real or a
+		// new (LocalThread) conversation would queue the send and then hit the SDK's
+		// NotImplementedException later, inside a coroutine, leaving the message stuck.
+		// TODO(upload-spec): remove when uploads exist.
+		private bool CanSendMedia()
+		{
+			return chatThread is global::Mix.FakeFriend.Datatypes.FakeThread;
 		}
 
 		private void ShowCameraComingSoon()
@@ -1079,7 +1100,7 @@ namespace Mix.Ui
 		{
 			MediaBar.Init(this, chatThread);
 			MediaTray.Init(this, chatThread);
-			CameraTray.Init(this);
+			CameraTray.Init(this, CanSendMedia, ShowCameraComingSoon);
 			ChatBar.Init(this, chatThread);
 			BottomNav.Init(this);
 			if (chatThread is IOfficialAccountChatThread)

@@ -25,7 +25,7 @@ namespace Disney.Native
 #else
 			native = base.gameObject.AddComponent<NativeCamera>();
 #endif
-			MediaPrep.ClearCache(MediaPrep.CacheDir);
+			MediaPrep.PruneCache(MediaPrep.CacheDir, MediaPrep.CacheMaxAge);
 		}
 
 		public void Init()

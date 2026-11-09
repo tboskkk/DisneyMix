@@ -27,11 +27,21 @@ namespace Disney.Native
 
 		public const int ThumbSize = 460;
 
+		// Camera apps stop a recording slightly past the limit we ask for, so a camera
+		// clip is allowed this much extra before it is rejected. Gallery picks stay exact.
+		public const long CameraDurationSlackMs = 2000L;
+
+		public const long CameraSizeSlackBytes = 2L * 1024 * 1024;
+
+		// Fake-friend chat messages keep these paths in the local database, so the media
+		// lives somewhere that survives a restart and is pruned by age instead of wiped.
+		public static readonly TimeSpan CacheMaxAge = TimeSpan.FromDays(7.0);
+
 		public static string CacheDir
 		{
 			get
 			{
-				return Path.Combine(Application.temporaryCachePath, "mixmedia");
+				return Path.Combine(Application.persistentDataPath, "mixmedia");
 			}
 		}
 
@@ -50,13 +60,15 @@ namespace Disney.Native
 			}
 		}
 
-		public static VideoCheck CheckVideo(long fileBytes, long durationMs)
+		public static VideoCheck CheckVideo(long fileBytes, long durationMs, bool fromCamera = false)
 		{
-			if (durationMs > MaxVideoSeconds * 1000L)
+			long maxMs = MaxVideoSeconds * 1000L + (fromCamera ? CameraDurationSlackMs : 0L);
+			long maxBytes = MaxVideoBytes + (fromCamera ? CameraSizeSlackBytes : 0L);
+			if (durationMs > maxMs)
 			{
 				return VideoCheck.TooLong;
 			}
-			if (fileBytes > MaxVideoBytes)
+			if (fileBytes > maxBytes)
 			{
 				return VideoCheck.TooLarge;
 			}
@@ -143,6 +155,38 @@ namespace Disney.Native
 			return path;
 		}
 
+		public static string CopyToCache(string sourcePath, string dir, string extension)
+		{
+			Directory.CreateDirectory(dir);
+			string path = Path.Combine(dir, Guid.NewGuid().ToString("N") + extension);
+			File.Copy(sourcePath, path);
+			return path;
+		}
+
+		public static void PruneCache(string dir, TimeSpan maxAge)
+		{
+			try
+			{
+				if (!Directory.Exists(dir))
+				{
+					return;
+				}
+				foreach (string file in Directory.GetFiles(dir))
+				{
+					if (DateTime.UtcNow - File.GetLastWriteTimeUtc(file) > maxAge)
+					{
+						File.Delete(file);
+					}
+				}
+			}
+			catch (IOException)
+			{
+			}
+			catch (UnauthorizedAccessException)
+			{
+			}
+		}
+
 		public static void ClearCache(string dir)
 		{
 			try
@@ -158,6 +202,33 @@ namespace Disney.Native
 			catch (UnauthorizedAccessException)
 			{
 			}
+		}
+	}
+
+	// The camera/picker plugins' IsBusy() checks are hard-wired to false on Android, so the
+	// bridge keeps its own re-entry guard. A timeout recovers from a callback that never comes.
+	public class MediaGate
+	{
+		public const float TimeoutSeconds = 10f;
+
+		private bool inFlight;
+
+		private float enteredAt;
+
+		public bool TryEnter(float now)
+		{
+			if (inFlight && now - enteredAt < TimeoutSeconds)
+			{
+				return false;
+			}
+			inFlight = true;
+			enteredAt = now;
+			return true;
+		}
+
+		public void Exit()
+		{
+			inFlight = false;
 		}
 	}
 }

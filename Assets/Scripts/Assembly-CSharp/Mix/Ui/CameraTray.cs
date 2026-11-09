@@ -1,3 +1,4 @@
+using System;
 using Disney.Native;
 using UnityEngine;
 using UnityEngine.Events;
@@ -11,11 +12,19 @@ namespace Mix.Ui
 
 		private INativeCamera listener;
 
+		private Func<bool> canSendMedia;
+
+		private Action onMediaUnavailable;
+
 		private bool isActive;
 
-		public void Init(INativeCamera aListener)
+		// aCanSendMedia is checked on every tap, before the camera opens, so a user is never
+		// sent to take a photo that the current conversation cannot send.
+		public void Init(INativeCamera aListener, Func<bool> aCanSendMedia, Action aOnMediaUnavailable)
 		{
 			listener = aListener;
+			canSendMedia = aCanSendMedia;
+			onMediaUnavailable = aOnMediaUnavailable;
 			// `var`: a global-namespace NativeCamera (the plugin) shadows Disney.Native.NativeCamera by name here.
 			var camera = MonoSingleton<NativeCameraManager>.Instance.Native;
 			if (camera == null || !camera.IsSupported)
@@ -31,18 +40,27 @@ namespace Mix.Ui
 			SetActive(root, "ComingSoonText", false);
 			Wire(root, "PhotoBtn", delegate
 			{
-				camera.ShowCameraOverlay(listener);
-				camera.TakePhoto();
+				if (MediaAvailable())
+				{
+					camera.ShowCameraOverlay(listener);
+					camera.TakePhoto();
+				}
 			});
 			Wire(root, "VideoBtn", delegate
 			{
-				camera.ShowCameraOverlay(listener);
-				camera.RecordVideo();
+				if (MediaAvailable())
+				{
+					camera.ShowCameraOverlay(listener);
+					camera.RecordVideo();
+				}
 			});
 			Wire(root, "LibraryBtn", delegate
 			{
-				camera.ShowCameraOverlay(listener);
-				camera.PickFromLibrary();
+				if (MediaAvailable())
+				{
+					camera.ShowCameraOverlay(listener);
+					camera.PickFromLibrary();
+				}
 			});
 			if (!global::NativeCamera.DeviceHasCamera())
 			{
@@ -54,6 +72,37 @@ namespace Mix.Ui
 		public void UpdateState(bool aState)
 		{
 			base.gameObject.SetActive(aState);
+		}
+
+		// The shipped prefab has these buttons disabled and faded for the "coming soon"
+		// look; a disabled Button never fires onClick.
+		public static void MakeButtonLive(Transform aButton)
+		{
+			Button button = aButton.GetComponent<Button>();
+			if (button != null)
+			{
+				button.interactable = true;
+			}
+			Graphic[] graphics = aButton.GetComponentsInChildren<Graphic>(true);
+			foreach (Graphic graphic in graphics)
+			{
+				Color color = graphic.color;
+				color.a = 1f;
+				graphic.color = color;
+			}
+		}
+
+		private bool MediaAvailable()
+		{
+			if (canSendMedia == null || canSendMedia())
+			{
+				return true;
+			}
+			if (onMediaUnavailable != null)
+			{
+				onMediaUnavailable();
+			}
+			return false;
 		}
 
 		private static void SetActive(Transform root, string childName, bool active)
@@ -76,6 +125,7 @@ namespace Mix.Ui
 				Debug.LogWarning("CameraTray: missing button " + root.name + "/" + childName);
 				return;
 			}
+			MakeButtonLive(child);
 			button.onClick.RemoveAllListeners();
 			button.onClick.AddListener(action);
 		}
